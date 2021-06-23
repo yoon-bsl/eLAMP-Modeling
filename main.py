@@ -4,8 +4,25 @@ import pandas as pd
 import numpy as np
 import scipy as sp
 import statistics
+import argparse
 import random
 import math
+
+class Model(object):
+    '''
+    Main object that will conduct all modeling, calculating, and plotting
+    of the amplicon formation and adsorption to the oil-water interface during
+    emulsion LAMP reactions
+
+    input args:
+
+    '''
+
+    def __init__(self):
+        self.setSeed()
+
+    def setSeed(self):
+        random.seed(1234)
 
 if __name__ == '__main__':
     # Set the random seed to make data reproducable
@@ -48,3 +65,10 @@ if __name__ == '__main__':
     # plt.figure()
     # ax = sb.boxplot(x=temp)
     # plt.show()
+
+    parser = argparse.ArgumentParser(description='Input for eLAMP monitoring')
+    parser.add_argument('integers', metavar='N', type=int, nargs='+',
+                        help='an integer for the accumulator')
+    parser.add_argument('--sum', dest='accumulate', action='store_const',
+                        const=sum, default=max,
+                        help='sum the integers (default: find the max)')
