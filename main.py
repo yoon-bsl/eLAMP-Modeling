@@ -17,18 +17,33 @@ class Model(object):
 
     '''
 
-    def __init__(self, dataFile='dropletDiameters.csv'):
+    def __init__(self, Dt, initialC, dataFile='dropletDiameters.csv'):
         self.dataFile = dataFile
+
+        self.Dt = Dt
+        self.initial = initialC
 
         self.setSeed()
 
     def run(self):
-        pass
+        self.dropletSizeAnalysis()
+
+        self.k = self.calculateGrowthConstant(self.Dt)
+        self.diff = self.calcaulteDiffusivity()
 
     def setSeed(self):
+        '''
+        If needed, will set the rng seed to ensure reproducibility of the
+        model's results over multiple runs
+        '''
         random.seed(1234)
 
     def dropletSizeAnalysis(self):
+        '''
+        Method takes the given droplet diameter data file and calculates the 
+        average and median volumes/surface areas of the droplets for use in
+        the model's given parameters
+        '''
          # Import droplet diameters from non-amplified emulsion droplets
         # containing LAMP reaction mixtures
         diams = pd.read_csv(self.dataFile, delimiter='\n')
@@ -62,6 +77,11 @@ class Model(object):
         print(f'Average surface area of measured droplets (in nm^3): {avgSA}')
         print(f'Median surface area of measured droplets (in nm^3):  {medSA}')
 
+        self.avgSA  = avgSA
+        self.medSA  = medSA
+        self.avgVol = avgVol
+        self.medVol = medVol
+
     def calculateGrowthConstant(self, Dt):
         '''
         Given a doubling time (in seconds) for LAMP, the function returns the
@@ -77,40 +97,45 @@ class Model(object):
 
     def calcaulteDiffusivity(self, bp):
         '''
-        Given the base pair length of a 
-        '''
-        pass
+        Given the base pair length of an amplicon, will return the diffusivity
+        of said amplicon. Based on Lukacs et al. from January 2000 in the
+        Journal of Biological Chemistry.
 
-    def calculate(self, initial, k, D):
+        input:
+        bp = base pair length of the amplicons
+
+        output:
+        diff = diffusivity of the amplicon (in cm^2/s)
+        '''
+        return ( 4.9 * ( 10 ** -6 ) ) * ( bp ** -0.72 )
+
+    def calculate(self, t, initial, k, D):
         '''
         Main amplicon creation/diffusion calculation. Uses same model as in
-        Ulep et al. published in July 2019. Combines Fick's diffusion 
-        equation with exponential growth of LAMP amplicons to model amplicon
-        adsorption to the oil-water interface.
+        Ulep et al. published in July 2019 in Scientific Reports. 
+        Combines Fick's diffusion equation with exponential growth of LAMP 
+        amplicons to model amplicon adsorption to the oil-water interface.
         '''
-        pass
+        return (2 * initial) * (math.exp(k * t )) * math.sqrt((D*t)/math.pi)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Model Emulsion LAMP amplicon creation and adsorption'
     )
 
-    parser.add_argument('-i', '--data', required=False, 
+    parser.add_argument('-i', '--input', required=False, 
                         help='Droplet data file name')
-    # parser.add_argument('-c', '--column', required=True,
-    #                 help='Image column containing sample colors')
-    # parser.add_argument('-f', '--fristclass', nargs='+', required=True,
-    #                 help='List containing sample #s of the first sample type')
-    # parser.add_argument('-s', '--secondclass', nargs='+', required=True,
-    #                 help='List containing sample #s of the second sample type')
-    # parser.add_argument('-t', '--thirdclass', nargs='+', required=True,
-    #                 help='List containing sample #s of the third sample type')
-    # parser.add_argument('-l', '--lastclass', nargs='+', required=True,
-    #                 help='List containing sample #s of the fourth sample type')
+    parser.add_argument('-d', '--doublingTime', required=True,
+                    help='Doubling time of the LAMP reaction (in seconds)')
+    parser.add_argument('-c', '--concentration', required=True,
+                    help='Initial concentration of target (in copy #/cm^3)')
+    parser.add_argument('-l', '--length', required=True,
+                    help='Base pair length of the primary target')
 
     args = parser.parse_args()
 
     model = Model(
-        args.data       
+        args.doublingTime,
+        dataFile=args.input       
         )
     model.run()
