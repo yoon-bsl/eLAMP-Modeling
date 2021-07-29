@@ -17,19 +17,45 @@ class Model(object):
 
     '''
 
-    def __init__(self, Dt, initialC, dataFile='dropletDiameters.csv'):
+    def __init__(self, Dt, initialC, bplength, type, 
+                            dataFile='dropletDiameters.csv'):
+
         self.dataFile = dataFile
 
-        self.Dt = Dt
+        self.Dt      = Dt
         self.initial = initialC
+        self.length  = bplength
 
-        self.setSeed()
+        if type.lower() not in ['avg', 'med']:
+            print('"Type" input parameter must be avg or med')
+            quit()
+        else:
+            self.type = type
+
+        self.run()
 
     def run(self):
         self.dropletSizeAnalysis()
 
         self.k = self.calculateGrowthConstant(self.Dt)
-        self.diff = self.calcaulteDiffusivity()
+        self.diff = self.calcaulteDiffusivity(self.length)
+
+        saturated = 0.0
+        t = 0
+        while saturated < 100:
+            conc = self.calculateDiffusion(t, self.initial, self.k, self.diff)
+            # TODO: calculate # of amplicons given above concentration over area
+            # TODO: calculate SA of the total number of amplicons above
+
+            if self.type == 'avg':
+                pass
+                # TODO: calculate saturation of the interface (% coverage)
+            else:
+                pass
+                # TODO: calculate saturation of the interface (% coverage)
+            # TODO: save the saturation to a list for plotting
+        
+        # TODO: plot the saturation over time 
 
     def setSeed(self):
         '''
@@ -65,7 +91,7 @@ class Model(object):
         surfaceArea = 4 * (nanoRadius ** 2) * math.pi       
         # surface area (nm^3)
 
-        diams["Surface Area (nm^3)"] = round(surfaceArea, 3)
+        diams["Surface Area (nm^2)"] = round(surfaceArea, 3)
 
         # Print the various statistics:
         avgVol = statistics.mean(diams["Volume (pL)"].tolist())
@@ -74,8 +100,8 @@ class Model(object):
         medSA  = statistics.median(diams["Surface Area (nm^3)"].tolist())
         print(f'Average volume of measured droplets (in pL):         {avgVol}')
         print(f'Median volume of measured droplets (in pL):          {medVol}')
-        print(f'Average surface area of measured droplets (in nm^3): {avgSA}')
-        print(f'Median surface area of measured droplets (in nm^3):  {medSA}')
+        print(f'Average surface area of measured droplets (in nm^2): {avgSA}')
+        print(f'Median surface area of measured droplets (in nm^2):  {medSA}')
 
         self.avgSA  = avgSA
         self.medSA  = medSA
@@ -109,7 +135,7 @@ class Model(object):
         '''
         return ( 4.9 * ( 10 ** -6 ) ) * ( bp ** -0.72 )
 
-    def calculate(self, t, initial, k, D):
+    def calculateDiffusion(self, t, initial, k, D):
         '''
         Main amplicon creation/diffusion calculation. Uses same model as in
         Ulep et al. published in July 2019 in Scientific Reports. 
@@ -131,11 +157,15 @@ if __name__ == '__main__':
                     help='Initial concentration of target (in copy #/cm^3)')
     parser.add_argument('-l', '--length', required=True,
                     help='Base pair length of the primary target')
+    parser.add_argument('-t', '--type', required=True,
+                help='Type of statistic to use for droplet size (avg or med)')
 
     args = parser.parse_args()
 
     model = Model(
         args.doublingTime,
+        args.concentration,
+        args.length,
+        args.type,
         dataFile=args.input       
         )
-    model.run()
