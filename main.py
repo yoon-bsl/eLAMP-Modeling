@@ -17,7 +17,7 @@ class Model(object):
 
     '''
 
-    def __init__(self, Dt, initialC, bplength, type, 
+    def __init__(self, Dt, initialC, bplength, type, eq,
                             dataFile='dropletDiameters.csv'):
 
         self.dataFile = dataFile
@@ -43,7 +43,7 @@ class Model(object):
         saturated = 0.0
         t = 0
         while saturated < 100:
-            conc = self.calculateDiffusion(t, self.initial, self.k, self.diff)
+            conc = self.calculateExpDiffusion(t, self.initial, self.k, self.diff)
             # TODO: calculate # of amplicons given above concentration over area
             # TODO: calculate SA of the total number of amplicons above
 
@@ -135,14 +135,24 @@ class Model(object):
         '''
         return ( 4.9 * ( 10 ** -6 ) ) * ( bp ** -0.72 )
 
-    def calculateDiffusion(self, t, initial, k, D):
+    def calculateExpDiffusion(self, t, initial, k, D):
         '''
-        Main amplicon creation/diffusion calculation. Uses same model as in
-        Ulep et al. published in July 2019 in Scientific Reports. 
+        Exponential amplicon creation/diffusion calculation. Uses same model as 
+        in Ulep et al. published in July 2019 in Scientific Reports. 
         Combines Fick's diffusion equation with exponential growth of LAMP 
         amplicons to model amplicon adsorption to the oil-water interface.
         '''
         return (2 * initial) * (math.exp(k * t )) * math.sqrt((D*t)/math.pi)
+
+    def calculateLogDiffusion(self, t, c, a, b, D):
+        '''
+        Logistic amplicon creation/diffusion calculation. Combines Fick's 
+        diffusion equation with logistic growth model of LAMP amplicon creation
+        to model amplicon adsorption to the oil-water interface.
+        '''
+        log = (2 * c) / (1 + a * (math.exp(-b * t)))
+        diff = math.sqrt((D * t) / math.pi)
+        return (log * diff)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -159,6 +169,8 @@ if __name__ == '__main__':
                     help='Base pair length of the primary target')
     parser.add_argument('-t', '--type', required=True,
                 help='Type of statistic to use for droplet size (avg or med)')
+    parser.add_argument('-e', '--equation', required=True,
+            help='Type of equation used for diffusion modeling (exp or log)')
 
     args = parser.parse_args()
 
@@ -167,5 +179,5 @@ if __name__ == '__main__':
         args.concentration,
         args.length,
         args.type,
-        dataFile=args.input       
+        args.equation     
         )
