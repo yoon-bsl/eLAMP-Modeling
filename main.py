@@ -17,45 +17,86 @@ class Model(object):
 
     '''
 
-    def __init__(self, Dt, initialC, bplength, type, eq,
-                            dataFile='dropletDiameters.csv'):
+    def __init__(self, dataFile, Dt, bplength, type, eq):
 
         self.dataFile = dataFile
 
-        self.Dt      = Dt
-        self.initial = initialC
-        self.length  = bplength
+        self.Dt      = int(Dt)
+        self.length  = int(bplength)
 
         if type.lower() not in ['avg', 'med']:
             print('"Type" input parameter must be avg or med')
             quit()
         else:
-            self.type = type
+            self.type = type.lower()
 
-        self.run()
+        if eq.lower() not in ['exp', 'log']:
+            print('"Equation" input parameter must be exp or log')
+            quit()
+        else:
+            self.eq = eq.lower()
 
-    def run(self):
+        self.run(self.eq)
+
+    def run(self, eq):
         self.dropletSizeAnalysis()
+
+        if self.type == 'avg':
+            self.initial = 1 / self.avgVol
+        elif self.type == 'med':
+            self.initial = 1 / self.medVol
+
+        print(f'Initial concentration (copy per cm^3): {self.initial}')
 
         self.k = self.calculateGrowthConstant(self.Dt)
         self.diff = self.calcaulteDiffusivity(self.length)
 
+        print(f'Growth constant (seconds^-1): {self.k}')
+        print(f'Diffusivity (cm^2 / s): {self.diff}')
+
         saturated = 0.0
         t = 0
+        saturationLevels = []
+        time = []
+        print('----------Modeling----------')
         while saturated < 100:
-            conc = self.calculateExpDiffusion(t, self.initial, self.k, self.diff)
-            # TODO: calculate # of amplicons given above concentration over area
-            # TODO: calculate SA of the total number of amplicons above
-
-            if self.type == 'avg':
-                pass
-                # TODO: calculate saturation of the interface (% coverage)
+            print(f'Time (seconds): {t}')
+            if eq == 'exp':
+                conc = self.calculateExpDiffusion(t, 
+                                                self.initial, 
+                                                self.k, 
+                                                self.diff)
             else:
-                pass
-                # TODO: calculate saturation of the interface (% coverage)
-            # TODO: save the saturation to a list for plotting
+                conc = self.calculateLogDiffusion(t, 
+                                                self.initial, 
+                                                self.k,
+                                                c,
+                                                a,
+                                                self.diff,
+                                                b=0.6)
+            print(f'Concentration: {conc}')
+            amplicons = self.convertConcToAmplicons(conc, self.type)
+            print(f'Number of amplicons: {amplicons}')
+            
+            SA = self.convertAmpliconToArea(amplicons, self.length)
+            print(f'Surface area of amplicons: {SA}')
+
+            saturated = self.calculateSaturation(SA, self.type)
+            print(f'Current saturation: {saturated}')
+
+            saturationLevels.append(saturated)
+            time.append(t/60)
+            
+            t += 1
+
+            if t > 600:
+                break
+            print('-----------')
         
-        # TODO: plot the saturation over time 
+        plt.plot(time[:-1], saturationLevels[:-1])
+        plt.xlabel('Time (min)')
+        plt.ylabel('Droplet Saturation (%)')
+        plt.show()
 
     def setSeed(self):
         '''
@@ -81,9 +122,8 @@ class Model(object):
         standardRadius = microRadius / (10 ** 6)    # get radius in meters
         centiRadius = standardRadius * 100          # radius in centimeters
         volume = (4/3)*(centiRadius**3)*math.pi     # volume in cm^3 or mL
-        picoVolume = volume * (10**9)               # volume in pL
 
-        diams["Volume (pL)"] = round(picoVolume, 3)
+        diams["Volume (cm^3)"] = round(volume, 20)
 
         # Create a data column representing the corresponding surface area
         # of each droplet from the diameter
@@ -94,12 +134,12 @@ class Model(object):
         diams["Surface Area (nm^2)"] = round(surfaceArea, 3)
 
         # Print the various statistics:
-        avgVol = statistics.mean(diams["Volume (pL)"].tolist())
-        avgSA  = statistics.mean(diams["Surface Area (nm^3)"].tolist())
-        medVol = statistics.median(diams["Volume (pL)"].tolist())
-        medSA  = statistics.median(diams["Surface Area (nm^3)"].tolist())
-        print(f'Average volume of measured droplets (in pL):         {avgVol}')
-        print(f'Median volume of measured droplets (in pL):          {medVol}')
+        avgVol = statistics.mean(diams["Volume (cm^3)"].tolist())
+        avgSA  = statistics.mean(diams["Surface Area (nm^2)"].tolist())
+        medVol = statistics.median(diams["Volume (cm^3)"].tolist())
+        medSA  = statistics.median(diams["Surface Area (nm^2)"].tolist())
+        print(f'Average volume of measured droplets (in mL):         {avgVol}')
+        print(f'Median volume of measured droplets (in mL):          {medVol}')
         print(f'Average surface area of measured droplets (in nm^2): {avgSA}')
         print(f'Median surface area of measured droplets (in nm^2):  {medSA}')
 
@@ -135,6 +175,34 @@ class Model(object):
         '''
         return ( 4.9 * ( 10 ** -6 ) ) * ( bp ** -0.72 )
 
+    def convertAmpliconToArea(self, amplicons, bp):
+        '''
+        Convert the base pair length of amplicons to hydrophobic area in nm^2
+        '''
+        mw = (2 * (bp * 607.4)) + 157.9 # MW in Da
+        radius = 0.066 * (mw ** (1/3))  # Radius in nm
+        area = math.pi * (radius ** 2)  # Hydrophobic area in nm^2
+        return (area * amplicons)
+
+    def convertConcToAmplicons(self, conc, type):
+        '''
+        Given the concentration of amplicons per unit area, will convert it to
+        # of amplicons
+        '''
+        if type == 'avg':
+            amplicons = (conc * (10**-14)) * self.avgSA
+        elif type == 'med':
+            amplicons = (conc * (10**-14)) * self.medSA
+        return amplicons
+
+    def calculateSaturation(self, SA, type):
+        '''
+        '''
+        if type == 'avg':
+            return (SA / self.avgSA)
+        elif type == 'med':
+            return (SA / self.medSA)
+
     def calculateExpDiffusion(self, t, initial, k, D):
         '''
         Exponential amplicon creation/diffusion calculation. Uses same model as 
@@ -142,15 +210,15 @@ class Model(object):
         Combines Fick's diffusion equation with exponential growth of LAMP 
         amplicons to model amplicon adsorption to the oil-water interface.
         '''
-        return (2 * initial) * (math.exp(k * t )) * math.sqrt((D*t)/math.pi)
+        return (2 * initial) * (math.exp(k * t)) * math.sqrt((D*t)/math.pi)
 
-    def calculateLogDiffusion(self, t, c, a, b, D):
+    def calculateLogDiffusion(self, t, initial, c, a, D, b=0.6):
         '''
         Logistic amplicon creation/diffusion calculation. Combines Fick's 
         diffusion equation with logistic growth model of LAMP amplicon creation
         to model amplicon adsorption to the oil-water interface.
         '''
-        log = (2 * c) / (1 + a * (math.exp(-b * t)))
+        log = (2 * c * initial) / (1 + a * (math.exp(-b * t)))
         diff = math.sqrt((D * t) / math.pi)
         return (log * diff)
 
@@ -160,11 +228,11 @@ if __name__ == '__main__':
     )
 
     parser.add_argument('-i', '--input', required=False, 
+                        default='dropletDiameters.csv',
                         help='Droplet data file name')
-    parser.add_argument('-d', '--doublingTime', required=True,
+    parser.add_argument('-d', '--doublingTime', required=False,
+                    default='24',
                     help='Doubling time of the LAMP reaction (in seconds)')
-    parser.add_argument('-c', '--concentration', required=True,
-                    help='Initial concentration of target (in copy #/cm^3)')
     parser.add_argument('-l', '--length', required=True,
                     help='Base pair length of the primary target')
     parser.add_argument('-t', '--type', required=True,
@@ -175,8 +243,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model = Model(
+        args.input,
         args.doublingTime,
-        args.concentration,
         args.length,
         args.type,
         args.equation     
