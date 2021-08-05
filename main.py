@@ -36,9 +36,12 @@ class Model(object):
         else:
             self.eq = eq.lower()
 
-        self.run(self.eq)
+        if self.eq == 'exp':
+            self.runExp()
+        else:
+            self.runLog()
 
-    def run(self, eq):
+    def runExp(self):
         self.dropletSizeAnalysis()
 
         if self.type == 'avg':
@@ -61,20 +64,12 @@ class Model(object):
         print('----------Modeling----------')
         while saturated < 100:
             print(f'Time (seconds): {t}')
-            if eq == 'exp':
-                conc = self.calculateExpDiffusion(t, 
-                                                self.initial, 
-                                                self.k, 
-                                                self.diff)
-            else:
-                conc = self.calculateLogDiffusion(t, 
-                                                self.initial, 
-                                                self.k,
-                                                c,
-                                                a,
-                                                self.diff,
-                                                b=0.6)
+            conc = self.calculateExpDiffusion(t, 
+                                            self.initial, 
+                                            self.k, 
+                                            self.diff)
             print(f'Concentration: {conc}')
+
             amplicons = self.convertConcToAmplicons(conc, self.type)
             print(f'Number of amplicons: {amplicons}')
             
@@ -86,9 +81,8 @@ class Model(object):
 
             saturationLevels.append(saturated)
             time.append(t/60)
-            
+    
             t += 1
-
             if t > 600:
                 break
             print('-----------')
@@ -97,6 +91,11 @@ class Model(object):
         plt.xlabel('Time (min)')
         plt.ylabel('Droplet Saturation (%)')
         plt.show()
+
+    def runLog(self):
+        '''
+        '''
+        pass
 
     def setSeed(self):
         '''
