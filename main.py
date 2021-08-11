@@ -17,12 +17,13 @@ class Model(object):
 
     '''
 
-    def __init__(self, dataFile, Dt, bplength, type, eq):
+    def __init__(self, dataFile, Dt, bplength, type, eq, sizes):
 
         self.dataFile = dataFile
 
         self.Dt      = int(Dt)
         self.length  = int(bplength)
+        self.sizes   = int(sizes)
 
         if type.lower() not in ['avg', 'med']:
             print('"Type" input parameter must be avg or med')
@@ -37,7 +38,8 @@ class Model(object):
             self.eq = eq.lower()
 
         if self.eq == 'exp':
-            self.runExp()
+            # self.runExp()
+            self.runExpLAMP()
         else:
             self.runLog()
 
@@ -84,6 +86,69 @@ class Model(object):
     
             t += 1
             if t > 600:
+                break
+            print('-----------')
+        
+        plt.plot(time[:-1], saturationLevels[:-1])
+        plt.xlabel('Time (min)')
+        plt.ylabel('Droplet Saturation (%)')
+        plt.show()
+
+    def runExpLAMP(self):
+        self.dropletSizeAnalysis()
+
+        if self.type == 'avg':
+            self.initial = 1 / self.avgVol
+        elif self.type == 'med':
+            self.initial = 1 / self.medVol
+
+        print(f'Initial concentration (copy per cm^3): {self.initial}')
+
+        diffSizes = {}
+
+        for i in range(1, self.sizes + 1):
+            # [base pair size, diffusivity, saturation level]
+            diffSizes[i] = [(self.length * i), None, 0.0]
+            diffSizes[i][1] = self.calcaulteDiffusivity(diffSizes[i][0])
+
+        self.k = self.calculateGrowthConstant(self.Dt)
+
+        print(f'Growth constant (seconds^-1): {self.k}')
+
+        print(diffSizes)
+
+        saturated = 0.0
+        t = 0
+        saturationLevels = []
+        time = []
+        print('----------Modeling----------')
+        while t < 600:
+            print(f'Time (seconds): {t}')
+            for bp in diffSizes.keys():
+                conc = self.calculateExpDiffusion(t, 
+                                                self.initial, 
+                                                self.k, 
+                                                diffSizes[bp][1])
+                # print(f'Concentration: {conc}')
+
+                amplicons = self.convertConcToAmplicons(conc, self.type)
+                # print(f'Number of amplicons: {amplicons}')
+                
+                SA = self.convertAmpliconToArea(amplicons, diffSizes[bp][0])
+                # print(f'Surface area of amplicons: {SA}')
+
+                diffSizes[bp][2] = self.calculateSaturation(SA, self.type)
+                print('Current saturation of {} amplicon size: {}'.format(
+                    diffSizes[bp][0],
+                    diffSizes[bp][2]
+                ))
+
+            saturated = sum([diffSizes[i][2] for i in diffSizes.keys()])
+            saturationLevels.append(saturated)
+            time.append(t/60)
+        
+            t += 1
+            if saturated > 100:
                 break
             print('-----------')
         
@@ -238,6 +303,8 @@ if __name__ == '__main__':
                 help='Type of statistic to use for droplet size (avg or med)')
     parser.add_argument('-e', '--equation', required=True,
             help='Type of equation used for diffusion modeling (exp or log)')
+    parser.add_argument('-a', '--ampliconSizes', required=True,
+            help='Number of amplicon sizes to use')
 
     args = parser.parse_args()
 
@@ -246,5 +313,6 @@ if __name__ == '__main__':
         args.doublingTime,
         args.length,
         args.type,
-        args.equation     
+        args.equation,
+        args.ampliconSizes     
         )
