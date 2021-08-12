@@ -41,7 +41,7 @@ class Model(object):
             # self.runExp()
             self.runExpLAMP()
         else:
-            self.runLog()
+            self.runLogLAMP()
 
     def runExp(self):
         self.dropletSizeAnalysis()
@@ -157,10 +157,77 @@ class Model(object):
         plt.ylabel('Droplet Saturation (%)')
         plt.show()
 
-    def runLog(self):
+    def runLogLAMP(self):
         '''
         '''
-        pass
+        self.dropletSizeAnalysis()
+
+        if self.type == 'avg':
+            self.initial = 1 / self.avgVol
+        elif self.type == 'med':
+            self.initial = 1 / self.medVol
+
+        diffSizes = {}
+
+        for i in range(1, self.sizes + 1):
+            # [base pair size, diffusivity, saturation level, c, a]
+            diffSizes[i] = [(self.length * i), None, 0.0, 0.0, 0.0]
+            diffSizes[i][1] = self.calcaulteDiffusivity(diffSizes[i][0])
+
+            # Calculate carrying capacity (c) for each bp length
+            temp = self.convertAmpliconToArea(1, diffSizes[i][0])
+            radius = math.sqrt(temp/math.pi)    # in nm
+            vol = (4/3)*math.pi*(radius * (10**-7))**3
+            if self.type == 'avg':
+                diffSizes[i][3] = self.avgVol / vol
+            elif self.type == 'med':
+                diffSizes[i][3] = (self.medVol / vol) * (10**-6)
+
+            # Calculate the (a) value for each bp length
+            diffSizes[i][4] = (diffSizes[i][3]/self.initial) - 1
+        
+        print(diffSizes)
+        
+        saturated = 0.0
+        t = 0
+        saturationLevels = []
+        time = []
+        print('----------Modeling----------')
+        while t < (600*3):
+            # print(f'Time (seconds): {t}')
+            for bp in diffSizes.keys():
+                conc = self.calculateLogDiffusion(t, 
+                                                self.initial, 
+                                                diffSizes[bp][3], 
+                                                diffSizes[bp][4],
+                                                diffSizes[bp][1])
+                # print(f'Concentration: {conc}')
+
+                amplicons = self.convertConcToAmplicons(conc, self.type)
+                print(f'Number of amplicons: {amplicons}')
+                
+                SA = self.convertAmpliconToArea(amplicons, diffSizes[bp][0])
+                # print(f'Surface area of amplicons: {SA}')
+
+                diffSizes[bp][2] = self.calculateSaturation(SA, self.type)
+                # print('Current saturation of {} amplicon size: {}'.format(
+                    # diffSizes[bp][0],
+                    # diffSizes[bp][2]
+                # ))
+
+            saturated = sum([diffSizes[i][2] for i in diffSizes.keys()])
+            saturationLevels.append(saturated)
+            time.append(t/60)
+        
+            t += 1
+            if saturated > 100:
+                break
+            # print('-----------')
+        
+        plt.plot(time[:-1], saturationLevels[:-1])
+        plt.xlabel('Time (min)')
+        plt.ylabel('Droplet Saturation (%)')
+        plt.show()
 
     def setSeed(self):
         '''
@@ -242,6 +309,9 @@ class Model(object):
     def convertAmpliconToArea(self, amplicons, bp):
         '''
         Convert the base pair length of amplicons to hydrophobic area in nm^2
+
+        amplicons = number of amplicons
+        bp = base pair length of amplicons
         '''
         mw = (2 * (bp * 607.4)) + 157.9 # MW in Da
         radius = 0.066 * (mw ** (1/3))  # Radius in nm
@@ -251,7 +321,10 @@ class Model(object):
     def convertConcToAmplicons(self, conc, type):
         '''
         Given the concentration of amplicons per unit area, will convert it to
-        # of amplicons
+        number of amplicons
+
+        conc = concentration of amplicons on surface area
+        type = avg or med
         '''
         if type == 'avg':
             amplicons = (conc * (10**-14)) * self.avgSA
@@ -261,6 +334,7 @@ class Model(object):
 
     def calculateSaturation(self, SA, type):
         '''
+        Returns percent saturation of the oil-water interface
         '''
         if type == 'avg':
             return (SA / self.avgSA)
@@ -276,13 +350,13 @@ class Model(object):
         '''
         return (2 * initial) * (math.exp(k * t)) * math.sqrt((D*t)/math.pi)
 
-    def calculateLogDiffusion(self, t, initial, c, a, D, b=0.6):
+    def calculateLogDiffusion(self, t, initial, c, a, D, b=5):
         '''
         Logistic amplicon creation/diffusion calculation. Combines Fick's 
         diffusion equation with logistic growth model of LAMP amplicon creation
         to model amplicon adsorption to the oil-water interface.
         '''
-        log = (2 * c * initial) / (1 + a * (math.exp(-b * t)))
+        log = (2 * c) / (1 + (a * (math.exp(-b * t))))
         diff = math.sqrt((D * t) / math.pi)
         return (log * diff)
 
