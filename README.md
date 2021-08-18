@@ -5,6 +5,8 @@ Outputs a figure depicting the percentage of emulsified droplet surface area sat
 
 <i>Based on the model found in Ulep, T.-H., Day, A.S., Sosnowski, K., Shumaker, A., & Yoon, J.-Y. Interfacial Effect-Based Quantification of Droplet Isothermal Nucleic Acid Amplification for Bacterial Infection. Sci. Rep. 9, 9629 (2019).</i>
 
+<i>DOI: https://doi.org/10.1038/s41598-019-46028-8.</i>
+
 ---
 Example command line run:  
 ```python
