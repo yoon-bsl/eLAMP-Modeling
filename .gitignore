@@ -1,7 +1,7 @@
 # To run virtual environments in python:
 # Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope Process ; & ./venv/scripts/activate.ps1 ; Set-ExecutionPolicy -ExecutionPolicy Default -Scope Process
 
-.vscode
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

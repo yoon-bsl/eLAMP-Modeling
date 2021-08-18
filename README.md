@@ -3,5 +3,5 @@ Mathematical modeling of the creation and adsorption of eLAMP amplicons to the o
 
 Example command line run:  
 ```python
-python main.py -l 193 -t med -e exp -d 24
+python main.py -l 193 -t med -e exp -d 24 -a
 ```
